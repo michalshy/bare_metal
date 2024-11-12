@@ -26,14 +26,39 @@
 
 #include "core.h"
 
+#define BUTTON_PIN (13)
+#define LED_PIN (1)
+
+enum BUTTON_STATE {
+	LOW = 0,
+	HIGH
+};
+
 /* Main program. */
 int main(void) {
-  RCC->AHB4ENR |= RCC_AHB4ENR_GPIOEEN;
-  GPIOE->MODER &= ~(0x3 << 2);
-  GPIOE->MODER |= (0x1 << 2);
-  GPIOE->OTYPER &= ~(1 << 1);
+	RCC->AHB4ENR |= RCC_AHB4ENR_GPIOEEN;
+	RCC->AHB4ENR |= RCC_AHB4ENR_GPIOCEN;
 
-  while (1) {
-    GPIOE->ODR |= (1 << 1);
-  }
+	GPIOC->MODER  &= ~(0x3 << (BUTTON_PIN*2));
+
+	GPIOE->MODER &= ~(0x3 << (LED_PIN * 2));
+	GPIOE->MODER |= (0x1 << (LED_PIN * 2));
+	GPIOE->OTYPER &= ~(1 << LED_PIN);
+
+	bool state = LOW;
+	bool block = 0;
+
+	while (1) {
+		//Change LED based on state change rather than just LED pressing
+		state = GPIOC->IDR;
+		if(state == LOW)
+		{
+			block = false;
+		}
+		if(state == HIGH && !block)
+		{
+			GPIOE->ODR ^= (1 << LED_PIN);
+			block = true;
+		}
+	}
 }
