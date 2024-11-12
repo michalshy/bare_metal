@@ -24,7 +24,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
-#include "core.h"
+#include "peripherals.h"
 
 #define BUTTON_PIN (13)
 #define LED_PIN (1)
