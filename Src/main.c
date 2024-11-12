@@ -1,3 +1,7 @@
+
+#if !defined(__SOFT_FP__) && defined(__ARM_FP)
+  #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
+#endif
 /**
  ******************************************************************************
  * @file           : main.c
@@ -17,13 +21,19 @@
  */
 
 #include <stdint.h>
+#include <inttypes.h>
+#include <stdbool.h>
 
-#if !defined(__SOFT_FP__) && defined(__ARM_FP)
-  #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
-#endif
+#include "core.h"
 
-int main(void)
-{
-    /* Loop forever */
-	for(;;);
+/* Main program. */
+int main(void) {
+  RCC->AHB4ENR |= RCC_AHB4ENR_GPIOEEN;
+  GPIOE->MODER &= ~(0x3 << 2);
+  GPIOE->MODER |= (0x1 << 2);
+  GPIOE->OTYPER &= ~(1 << 1);
+
+  while (1) {
+    GPIOE->ODR |= (1 << 1);
+  }
 }
