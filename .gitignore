@@ -1,6 +1,6 @@
 Debug
 .settings
-
+*.launch
 # Object files
 *.o
 *.ko
