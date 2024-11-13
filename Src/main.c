@@ -63,7 +63,7 @@ static inline void systick_init(uint32_t ticks) {
   SYSTICK->LOAD = ticks - 1;
   SYSTICK->VAL = 0;
   SYSTICK->CTRL = BIT(0) | BIT(1) | BIT(2);  // Enable systick
-  RCC->APB2ENR |= BIT(14);                   // Enable SYSCFG
+  RCC->APB4ENR |= BIT(1);                   // Enable SYSCFG
 }
 
 enum BUTTON_STATE {
@@ -92,7 +92,7 @@ int main(void) {
 	uint16_t led_yellow = PIN('E', 1);
 	uint16_t button = PIN('C', 13);
 
-	systick_init(32000000 / 1000);
+	systick_init(16000000 / 1000);
 
 	RCC->AHB4ENR |= BIT(PINBANK(led_red));
 	RCC->AHB4ENR |= BIT(PINBANK(led_yellow));
