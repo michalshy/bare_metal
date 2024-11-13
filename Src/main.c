@@ -33,6 +33,11 @@
 
 #define GPIO(bank) ((GPIO_TypeDef *) (D3_AHB1PERIPH_BASE + 0x400 * (bank)))
 
+struct systick {
+  volatile uint32_t CTRL, LOAD, VAL, CALIB;
+};
+#define SYSTICK ((struct systick *) 0xe000e010)  // 2.2.2
+
 // Enum values are per datasheet: 0, 1, 2, 3
 enum { GPIO_MODE_INPUT, GPIO_MODE_OUTPUT, GPIO_MODE_AF, GPIO_MODE_ANALOG };
 
@@ -53,11 +58,32 @@ static inline bool gpio_read(uint16_t pin) {
 	return gpio->IDR;
 }
 
+static inline void systick_init(uint32_t ticks) {
+  if ((ticks - 1) > 0xffffff) return;  // Systick timer is 24 bit
+  SYSTICK->LOAD = ticks - 1;
+  SYSTICK->VAL = 0;
+  SYSTICK->CTRL = BIT(0) | BIT(1) | BIT(2);  // Enable systick
+  RCC->APB2ENR |= BIT(14);                   // Enable SYSCFG
+}
+
 enum BUTTON_STATE {
 	LOW = 0,
 	HIGH
 };
 
+static volatile uint32_t s_ticks;
+void SysTick_Handler(void) {
+  s_ticks++;
+}
+
+// t: expiration time, prd: period, now: current time. Return true if expired
+bool timer_expired(uint32_t *t, uint32_t prd, uint32_t now) {
+  if (now + prd < *t) *t = 0;                    // Time wrapped? Reset timer
+  if (*t == 0) *t = now + prd;                   // Firt poll? Set expiration
+  if (*t > now) return false;                    // Not expired yet, return
+  *t = (now - *t) > prd ? now + prd : *t + prd;  // Next expiration time
+  return true;                                   // Expired, return true
+}
 
 
 /* Main program. */
@@ -65,6 +91,8 @@ int main(void) {
 	uint16_t led_red = PIN('B', 14);
 	uint16_t led_yellow = PIN('E', 1);
 	uint16_t button = PIN('C', 13);
+
+	systick_init(32000000 / 1000);
 
 	RCC->AHB4ENR |= BIT(PINBANK(led_red));
 	RCC->AHB4ENR |= BIT(PINBANK(led_yellow));
@@ -78,7 +106,14 @@ int main(void) {
 	bool toSwitch = HIGH;
 	bool block = 0;
 
+	uint32_t timer = 0, period = 1000;
 	while (1) {
+		if (timer_expired(&timer, period, s_ticks)) {
+			  static bool on;       // This block is executed
+			  gpio_write(led_red, on);  // Every `period` milliseconds
+			  on = !on;             // Toggle LED state
+		}
+
 		//Change LED based on state change rather than just LED pressing
 		state = gpio_read(button);
 		if(state == LOW)
