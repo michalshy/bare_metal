@@ -26,38 +26,72 @@
 
 #include "peripherals.h"
 
-#define BUTTON_PIN (13)
-#define LED_PIN (1)
+#define BIT(x) (1UL << (x))
+#define PIN(bank, num) ((((bank) - 'A') << 8) | (num))
+#define PINNO(pin) (pin & 255)
+#define PINBANK(pin) (pin >> 8)
+
+struct gpio {
+  volatile uint32_t MODER, OTYPER, OSPEEDR, PUPDR, IDR, ODR, BSRR, LCKR, AFR[2];
+};
+#define GPIO(bank) ((struct gpio *) (D3_AHB1PERIPH_BASE + 0x400 * (bank)))
+
+// Enum values are per datasheet: 0, 1, 2, 3
+enum { GPIO_MODE_INPUT, GPIO_MODE_OUTPUT, GPIO_MODE_AF, GPIO_MODE_ANALOG };
+
+static inline void gpio_set_mode(uint16_t pin, uint8_t mode) {
+  struct gpio *gpio = GPIO(PINBANK(pin));  // GPIO bank
+  int n = PINNO(pin);                      // Pin number
+  gpio->MODER &= ~(3U << (n * 2));         // Clear existing setting
+  gpio->MODER |= (mode & 3) << (n * 2);    // Set new mode
+}
+
+static inline void gpio_write(uint16_t pin, bool val) {
+  struct gpio *gpio = GPIO(PINBANK(pin));
+  gpio->BSRR = (1U << PINNO(pin)) << (val ? 0 : 16);
+}
+
+static inline bool gpio_read(uint16_t pin) {
+	struct gpio *gpio = GPIO(PINBANK(pin));
+	return gpio->IDR;
+}
 
 enum BUTTON_STATE {
 	LOW = 0,
 	HIGH
 };
 
+
+
 /* Main program. */
 int main(void) {
-	RCC->AHB4ENR |= RCC_AHB4ENR_GPIOEEN;
-	RCC->AHB4ENR |= RCC_AHB4ENR_GPIOCEN;
+	uint16_t led_red = PIN('B', 14);
+	uint16_t led_yellow = PIN('E', 1);
+	uint16_t button = PIN('C', 13);
 
-	GPIOC->MODER  &= ~(0x3 << (BUTTON_PIN*2));
+	RCC->AHB4ENR |= BIT(PINBANK(led_red));
+	RCC->AHB4ENR |= BIT(PINBANK(led_yellow));
+	RCC->AHB4ENR |= BIT(PINBANK(button));
 
-	GPIOE->MODER &= ~(0x3 << (LED_PIN * 2));
-	GPIOE->MODER |= (0x1 << (LED_PIN * 2));
-	GPIOE->OTYPER &= ~(1 << LED_PIN);
+	gpio_set_mode(button, GPIO_MODE_INPUT);
+	gpio_set_mode(led_yellow, GPIO_MODE_OUTPUT);
+	gpio_set_mode(led_red, GPIO_MODE_OUTPUT);
 
 	bool state = LOW;
+	bool toSwitch = HIGH;
 	bool block = 0;
 
 	while (1) {
 		//Change LED based on state change rather than just LED pressing
-		state = GPIOC->IDR;
+		state = gpio_read(button);
 		if(state == LOW)
 		{
 			block = false;
 		}
 		if(state == HIGH && !block)
 		{
-			GPIOE->ODR ^= (1 << LED_PIN);
+			gpio_write(led_yellow, toSwitch);
+			toSwitch = !toSwitch;
 			block = true;
 		}
 	}
